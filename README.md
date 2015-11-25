@@ -1,5 +1,5 @@
 # SumBasic
-Implementation of SumBasic
+Implementation of SumBasic. Can be used to summarize news articles.
 
 ## Running the Program
 
