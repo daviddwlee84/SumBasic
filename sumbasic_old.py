@@ -1,7 +1,6 @@
-import nltk, os, sys
-
-reload(sys)  
-sys.setdefaultencoding('utf8')
+import nltk
+import os
+import sys
 
 folder = 'docs/'
 cluster_range = (1, 4)
@@ -11,19 +10,21 @@ num_sentences = 5
 stopwords = nltk.corpus.stopwords.words('english')
 lemmatizer = nltk.stem.WordNetLemmatizer()
 
+
 def get_clusters(folder):
-	#Store dict of lists of file paths, one list per cluster
-	clusters = {} 
-	#Initialize clusters in dict
-	for i in range(cluster_range[0],cluster_range[1]+1):
-		clusters[i] = [] 
-	#Populate cluster dict
+	# Store dict of lists of file paths, one list per cluster
+	clusters = {}
+	# Initialize clusters in dict
+	for i in range(cluster_range[0], cluster_range[1]+1):
+		clusters[i] = []
+	# Populate cluster dict
 	for f in os.listdir(folder):
-		for i in range(cluster_range[0],cluster_range[1]+1):
-			if f.startswith('doc%d' % i): 
+		for i in range(cluster_range[0], cluster_range[1]+1):
+			if f.startswith('doc%d' % i):
 				clusters[i].append(os.path.join(folder, f))
 				break
 	return clusters
+
 
 def get_probabilities(cluster, lemmatize, rm_stopwords):
 	# Store word probabilities for this cluster
@@ -45,6 +46,7 @@ def get_probabilities(cluster, lemmatize, rm_stopwords):
 		word_ps[word_p] = word_ps[word_p]/float(token_count)
 	return word_ps
 
+
 def get_sentences(cluster):
 	sentences = []
 	for path in cluster:
@@ -52,11 +54,13 @@ def get_sentences(cluster):
 			sentences += nltk.sent_tokenize(f.read())
 	return sentences
 
+
 def clean_sentence(tokens):
 	tokens = [t.lower() for t in tokens]
 	if lemmatize: tokens = [lemmatizer.lemmatize(t) for t in tokens]
 	if rm_stopwords: tokens = [t for t in tokens if t not in stopwords]
 	return tokens
+
 
 def score_sentence(sentence, word_ps):
 	score = 0.0
@@ -69,6 +73,7 @@ def score_sentence(sentence, word_ps):
 			num_tokens += 1.0
 	return float(score)/float(num_tokens)
 
+
 def max_sentence(sentences, word_ps, simplified):
 	max_sentence = None
 	max_score = None
@@ -80,6 +85,7 @@ def max_sentence(sentences, word_ps, simplified):
 	if not simplified: update_ps(max_sentence, word_ps)
 	return max_sentence
 
+
 def update_ps(max_sentence, word_ps):
 	sentence = nltk.word_tokenize(max_sentence)
 	sentence = clean_sentence(sentence)
@@ -87,18 +93,20 @@ def update_ps(max_sentence, word_ps):
 		word_ps[word] = word_ps[word]**2
 	return True
 
+
 def sumbasic(clusters, simplified):
 	summaries = {}
 	for cluster in clusters:
 		summaries[cluster] = []
-		#Get word probabilities for each word
+		# Get word probabilities for each word
 		word_ps = get_probabilities(clusters[cluster], lemmatize, rm_stopwords)
-		#Get all the sentences in a cluster
+		# Get all the sentences in a cluster
 		sentences = get_sentences(clusters[cluster])
-		#Compile summary
+		# Compile summary
 		for i in range(num_sentences):
 			summaries[cluster].append(max_sentence(sentences, word_ps, simplified))
 	return summaries
+
 
 def leading(clusters):
 	summaries = {}
@@ -108,9 +116,9 @@ def leading(clusters):
 		for i in range(num_sentences):
 			summaries[cluster].append(sentences[i])
 	return summaries
-	
+
  def main():
-	#Get dict of lists, one list for each cluster
+	# Get dict of lists, one list for each cluster
 	print "Getting clusters..."
 	clusters = get_clusters(folder)
 	print "Simple sumbasic..."
