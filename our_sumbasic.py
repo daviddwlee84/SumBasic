@@ -17,6 +17,17 @@ stopwords = nltk.corpus.stopwords.words('english')
 lemmatizer = nltk.stem.WordNetLemmatizer()
 
 
+DATA_TO_TEST = {
+    'Overall': 'test.txt.oracle',
+    'Future': 'future/test.txt.oracle',
+    'Contribution': 'contribution/test.txt.oracle',
+    'Baseline': 'baseline/test.txt.oracle',
+    'Dataset': 'dataset/test.txt.oracle',
+    'Metric': 'metric/test.txt.oracle',
+    'Motivation': 'motivation/test.txt.oracle'
+}
+
+
 def clean_sentence(tokens):
     # print('Cleaning sentences...')
     tokens = [t.lower() for t in tokens]
@@ -167,26 +178,30 @@ def calculate_performance(predicts: List[Tuple[int]], golds: List[Tuple[int]]):
         total_predicted_positive += len(os)
         precision = total_correct / total_predicted_positive
         recall = total_correct / total_gold_positive
+        if precision + recall > 0:
+            f1 = 2 * precision * recall / (precision + recall)
+        else:
+            f1 = 0
 
     return {
         'acc_hit1': total_hit1 / len(golds),
         'p': precision,
         'r (acc_sentence_level)': recall,
-        'f1': 2 * precision * recall / (precision + recall)
+        'f1': f1
     }
 
 
-def write_output(performance: Dict[str, float], summaries: List[List[str]], scores: List[List[int]]):
-    """ write sentence prediction and score """
+def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], scores: List[List[int]]):
+    """ evaluate and write sentence prediction and score """
     print('Writting output...')
     if os.path.exists(OUTPUT_DIR):
         shutil.rmtree(OUTPUT_DIR)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+    # Predict
+
     predicts_file = os.path.join(
         OUTPUT_DIR, f'prediction_{method}_{num_sentences}.txt')
-    performance_file = os.path.join(
-        OUTPUT_DIR, f'performance_{method}_{num_sentences}.txt')
 
     predict_fp = open(predicts_file, 'w')
 
@@ -195,8 +210,22 @@ def write_output(performance: Dict[str, float], summaries: List[List[str]], scor
 
     predict_fp.close()
 
-    with open(performance_file, 'w') as performance_fp:
-        performance_fp.write(str(performance))
+    # Performance
+
+    performance_file = os.path.join(
+        OUTPUT_DIR, f'performance_{method}_{num_sentences}.txt')
+    
+    performance_fp = open(performance_file, 'w')
+
+    for topic, test_file in DATA_TO_TEST.items():
+        with open(os.path.join(DATAPATH, test_file), 'r') as stream:
+            raw_labels = stream.readlines()
+        labels = [make_tuple(raw_label) for raw_label in raw_labels]
+        performance = calculate_performance(sent_ids, labels)
+        print(topic, performance)
+        performance_fp.write(f'{topic} {performance}\n')
+
+    performance_fp.close()
 
 #################
 
@@ -216,14 +245,7 @@ def main():
 
     sent_ids = summaries_to_sent_ids(papers, summaries)
 
-    with open(os.path.join(DATAPATH, 'test.txt.oracle'), 'r') as stream:
-        raw_labels = stream.readlines()
-    labels = [make_tuple(raw_label) for raw_label in raw_labels]
-
-    performance = calculate_performance(sent_ids, labels)
-    print(performance)
-
-    write_output(performance, summaries, scores)
+    eval_write_output(summaries, sent_ids, scores)
 
 
 if __name__ == '__main__':
