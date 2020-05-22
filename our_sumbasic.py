@@ -12,7 +12,9 @@ method = sys.argv[1]
 
 lemmatize = True
 rm_stopwords = True
-num_sentences = 5
+# NUM_SENTENCES = 5
+# PERCENT = None
+PERCENT = 0.15
 stopwords = nltk.corpus.stopwords.words('english')
 lemmatizer = nltk.stem.WordNetLemmatizer()
 
@@ -119,6 +121,12 @@ def orig(cluster):
     word_ps = get_probabilities(cluster, lemmatize, rm_stopwords)
     sentences = get_sentences(cluster)
     summary = []
+
+    if PERCENT is not None and PERCENT >= 0:
+        num_sentences = int(len(sentences) * PERCENT)
+    else:
+        num_sentences = NUM_SENTENCES
+
     for i in range(num_sentences):
         summary.append(max_sentence(sentences, word_ps, False))
     return summary, sentences
@@ -129,6 +137,12 @@ def simplified(cluster):
     word_ps = get_probabilities(cluster, lemmatize, rm_stopwords)
     sentences = get_sentences(cluster)
     summary = []
+
+    if PERCENT is not None and PERCENT >= 0:
+        num_sentences = int(len(sentences) * PERCENT)
+    else:
+        num_sentences = NUM_SENTENCES
+
     for i in range(num_sentences):
         summary.append(max_sentence(sentences, word_ps, True))
     return summary, sentences
@@ -138,6 +152,12 @@ def leading(cluster):
     cluster = glob.glob(cluster)
     sentences = get_sentences(cluster)
     summary = []
+
+    if PERCENT is not None and PERCENT >= 0:
+        num_sentences = int(len(sentences) * PERCENT)
+    else:
+        num_sentences = NUM_SENTENCES
+
     for i in range(num_sentences):
         summary.append(sentences[i])
     return summary, sentences
@@ -199,9 +219,12 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], sco
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Predict
-
-    predicts_file = os.path.join(
-        OUTPUT_DIR, f'prediction_{method}_{num_sentences}.txt')
+    if PERCENT is not None and PERCENT >= 0:
+        predicts_file = os.path.join(
+            OUTPUT_DIR, f'prediction_{method}_{PERCENT}.txt')
+    else:
+        predicts_file = os.path.join(
+            OUTPUT_DIR, f'prediction_{method}_{NUM_SENTENCES}.txt')
 
     predict_fp = open(predicts_file, 'w')
 
@@ -212,8 +235,12 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], sco
 
     # Performance
 
-    performance_file = os.path.join(
-        OUTPUT_DIR, f'performance_{method}_{num_sentences}.txt')
+    if PERCENT is not None and PERCENT >= 0:
+        performance_file = os.path.join(
+            OUTPUT_DIR, f'performance_{method}_{PERCENT}.txt')
+    else:
+        performance_file = os.path.join(
+            OUTPUT_DIR, f'performance_{method}_{NUM_SENTENCES}.txt')
     
     performance_fp = open(performance_file, 'w')
 
