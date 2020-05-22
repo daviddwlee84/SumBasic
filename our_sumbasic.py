@@ -122,7 +122,7 @@ def orig(cluster):
     sentences = get_sentences(cluster)
     summary = []
 
-    if PERCENT is not None and PERCENT >= 0:
+    if PERCENT is not None and PERCENT > 0:
         num_sentences = int(len(sentences) * PERCENT)
     else:
         num_sentences = NUM_SENTENCES
@@ -138,7 +138,7 @@ def simplified(cluster):
     sentences = get_sentences(cluster)
     summary = []
 
-    if PERCENT is not None and PERCENT >= 0:
+    if PERCENT is not None and PERCENT > 0:
         num_sentences = int(len(sentences) * PERCENT)
     else:
         num_sentences = NUM_SENTENCES
@@ -153,7 +153,7 @@ def leading(cluster):
     sentences = get_sentences(cluster)
     summary = []
 
-    if PERCENT is not None and PERCENT >= 0:
+    if PERCENT is not None and PERCENT > 0:
         num_sentences = int(len(sentences) * PERCENT)
     else:
         num_sentences = NUM_SENTENCES
@@ -219,7 +219,7 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], sco
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Predict
-    if PERCENT is not None and PERCENT >= 0:
+    if PERCENT is not None and PERCENT > 0:
         predicts_file = os.path.join(
             OUTPUT_DIR, f'prediction_{method}_{PERCENT}.txt')
     else:
@@ -235,7 +235,7 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], sco
 
     # Performance
 
-    if PERCENT is not None and PERCENT >= 0:
+    if PERCENT is not None and PERCENT > 0:
         performance_file = os.path.join(
             OUTPUT_DIR, f'performance_{method}_{PERCENT}.txt')
     else:
