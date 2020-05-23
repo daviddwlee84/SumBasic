@@ -129,7 +129,7 @@ def orig(cluster):
 
     for i in range(num_sentences):
         summary.append(max_sentence(sentences, word_ps, False))
-    return summary, sentences
+    return summary, sentences, num_sentences
 
 
 def simplified(cluster):
@@ -145,7 +145,7 @@ def simplified(cluster):
 
     for i in range(num_sentences):
         summary.append(max_sentence(sentences, word_ps, True))
-    return summary, sentences
+    return summary, sentences, num_sentences
 
 
 def leading(cluster):
@@ -160,7 +160,7 @@ def leading(cluster):
 
     for i in range(num_sentences):
         summary.append(sentences[i])
-    return summary, sentences
+    return summary, sentences, num_sentences
 
 # COPY from LexRank
 
@@ -211,7 +211,7 @@ def calculate_performance(predicts: List[Tuple[int]], golds: List[Tuple[int]]):
     }
 
 
-def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], scores: List[List[int]]):
+def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], scores: List[List[int]], sent_amount: List[int]):
     """ evaluate and write sentence prediction and score """
     print('Writting output...')
     if os.path.exists(OUTPUT_DIR):
@@ -252,6 +252,14 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], sco
         print(topic, performance)
         performance_fp.write(f'{topic} {performance}\n')
 
+    total_sents = sum(sent_amount)
+    print(f'Total sentences: {total_sents}')
+    performance_fp.write(f'Total sentences: {total_sents}\n')
+    print(f'Total average per paper: {total_sents/len(sent_amount)}')
+    performance_fp.write(f'Total average per paper: {total_sents/len(sent_amount)}\n')
+    print(f'Sentences for each paper: {sent_amount}')
+    performance_fp.write(f'Sentences for each paper: {sent_amount}\n')
+
     performance_fp.close()
 
 #################
@@ -263,16 +271,18 @@ def main():
     papers = []
     scores = []
     summaries = []
+    sent_amount = []
     for filename in tqdm(glob.glob(cluster)):
-        result, sentences = eval(method + "('" + filename + "')")
+        result, sentences, num_sentences = eval(method + "('" + filename + "')")
         summary, score = list(zip(*result))
         papers.append(sentences)
         scores.append(score)
         summaries.append(summary)
+        sent_amount.append(num_sentences)
 
     sent_ids = summaries_to_sent_ids(papers, summaries)
 
-    eval_write_output(summaries, sent_ids, scores)
+    eval_write_output(summaries, sent_ids, scores, sent_amount)
 
 
 if __name__ == '__main__':
