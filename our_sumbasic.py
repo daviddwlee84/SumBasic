@@ -326,7 +326,7 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], top
         # TODO: somehow the prediction index exceed range
         predict_sents = [[papers[i][index] for index in predict_label if index < len(papers[i])] for i, predict_label in enumerate(pred_ids)]
 
-        bleu_performance = compute_bleu_raw(gold_sents, predict_sents, labels, sent_ids)
+        bleu_performance = compute_bleu_raw(gold_sents, predict_sents, labels, pred_ids)
 
         print(topic, performance, bleu_performance)
         performance_fp.write(f'{topic} {performance} {bleu_performance}\n')
