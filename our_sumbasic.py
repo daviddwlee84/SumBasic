@@ -4,12 +4,15 @@ import glob
 import os
 import shutil
 from tqdm import tqdm
-from parse_data import DATA_DIR, OUTPUT_DIR, DATAPATH
+from parse_data import DATA_DIR, OUTPUT_DIR, DATAPATH, DATA_TO_TEST, TEST_PAPER, TEST_PAPER_SECTION, PAPER_REF
 from typing import List, Tuple, Dict
 from ast import literal_eval as make_tuple
 import nltk
 
-method = sys.argv[1]
+if len(sys.argv) >= 2:
+    method = sys.argv[1]
+else:
+    method = 'orig'
 
 lemmatize = True
 rm_stopwords = True
@@ -19,19 +22,6 @@ PERCENT = 0.15
 stopwords = nltk.corpus.stopwords.words('english')
 lemmatizer = nltk.stem.WordNetLemmatizer()
 
-
-DATA_TO_TEST = {
-    'Overall': 'test.txt.oracle',
-    'Future': 'future/test.txt.oracle',
-    'Contribution': 'contribution/test.txt.oracle',
-    'Baseline': 'baseline/test.txt.oracle',
-    'Dataset': 'dataset/test.txt.oracle',
-    'Metric': 'metric/test.txt.oracle',
-    'Motivation': 'motivation/test.txt.oracle'
-}
-
-TEST_PAPER = {key: value.replace('oracle', 'src') for key, value in DATA_TO_TEST.items()}
-PAPER_REF = {key: value.replace('oracle', 'ref') for key, value in DATA_TO_TEST.items()}
 
 def get_id_match() -> Dict[str, List[int]]:
     """ some topic might not exist in the entire test set,
@@ -145,7 +135,8 @@ def orig(cluster):
     summary = []
 
     if PERCENT is not None and PERCENT > 0:
-        num_sentences = int(len(sentences) * PERCENT)
+        num_sentences = max(int(len(sentences) * PERCENT), 1)
+        # note: if this value == 0 will have problem
     else:
         num_sentences = NUM_SENTENCES
 
@@ -161,7 +152,7 @@ def simplified(cluster):
     summary = []
 
     if PERCENT is not None and PERCENT > 0:
-        num_sentences = int(len(sentences) * PERCENT)
+        num_sentences = max(int(len(sentences) * PERCENT), 1)
     else:
         num_sentences = NUM_SENTENCES
 
@@ -176,7 +167,7 @@ def leading(cluster):
     summary = []
 
     if PERCENT is not None and PERCENT > 0:
-        num_sentences = int(len(sentences) * PERCENT)
+        num_sentences = max(int(len(sentences) * PERCENT), 1)
     else:
         num_sentences = NUM_SENTENCES
 
@@ -218,12 +209,14 @@ def calculate_performance(predicts: List[Tuple[int]], golds: List[Tuple[int]]):
 
         total_gold_positive += len(ts)
         total_predicted_positive += len(os)
-        precision = total_correct / total_predicted_positive
-        recall = total_correct / total_gold_positive
-        if precision + recall > 0:
-            f1 = 2 * precision * recall / (precision + recall)
-        else:
-            f1 = 0
+
+    precision = total_correct / total_predicted_positive
+    recall = total_correct / total_gold_positive
+
+    if precision + recall > 0:
+        f1 = 2 * precision * recall / (precision + recall)
+    else:
+        f1 = 0
 
     return {
         'acc_hit1': total_hit1 / len(golds),
@@ -277,20 +270,20 @@ def compute_bleu_raw(gold_sents: List[Tuple[str]], predict_sents: List[Tuple[str
 
 
 
-def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], topic_id_to_id: Dict[str, List[int]], scores: List[List[int]], sent_amount: List[int]):
+def eval_write_output(topic: str, summaries: List[List[str]], sent_ids: List[List[int]], topic_id_to_id: Dict[str, List[int]], scores: List[List[int]], sent_amount: List[int]):
     """ evaluate and write sentence prediction and score """
     print('Writting output...')
-    if os.path.exists(OUTPUT_DIR):
-        shutil.rmtree(OUTPUT_DIR)
+    # if os.path.exists(OUTPUT_DIR):
+    #     shutil.rmtree(OUTPUT_DIR)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Predict
     if PERCENT is not None and PERCENT > 0:
         predicts_file = os.path.join(
-            OUTPUT_DIR, f'prediction_{method}_{PERCENT}.txt')
+            OUTPUT_DIR, f'{topic}_prediction_{method}_{PERCENT}.txt')
     else:
         predicts_file = os.path.join(
-            OUTPUT_DIR, f'prediction_{method}_{NUM_SENTENCES}.txt')
+            OUTPUT_DIR, f'{topic}_prediction_{method}_{NUM_SENTENCES}.txt')
 
     predict_fp = open(predicts_file, 'w')
 
@@ -303,19 +296,49 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], top
 
     if PERCENT is not None and PERCENT > 0:
         performance_file = os.path.join(
-            OUTPUT_DIR, f'performance_{method}_{PERCENT}.txt')
+            OUTPUT_DIR, f'{topic}_performance_{method}_{PERCENT}.txt')
     else:
         performance_file = os.path.join(
-            OUTPUT_DIR, f'performance_{method}_{NUM_SENTENCES}.txt')
+            OUTPUT_DIR, f'{topic}_performance_{method}_{NUM_SENTENCES}.txt')
     
     performance_fp = open(performance_file, 'w')
 
-    for topic, test_file in DATA_TO_TEST.items():
-        with open(os.path.join(DATAPATH, test_file), 'r') as stream:
+    if topic == 'Overall':
+        # test on each topic with entire paper set
+        for sub_topic, test_file in DATA_TO_TEST.items():
+            with open(os.path.join(DATAPATH, test_file), 'r') as stream:
+                raw_labels = stream.readlines()
+            labels = [make_tuple(raw_label) for raw_label in raw_labels]
+
+            pred_ids = [sent_ids[topic_id_to_id[sub_topic][i]] for i in range(len(raw_labels))]
+            performance = calculate_performance(pred_ids, labels)
+
+            with open(os.path.join(DATAPATH, TEST_PAPER[sub_topic]), 'r') as stream:
+                raw_papers = stream.readlines()
+            papers = [paper.strip().split('##SENT##') for paper in raw_papers]
+
+            gold_sents = [[papers[i][index] for index in gold_label] for i, gold_label in enumerate(labels)]
+            # TODO: somehow the prediction index exceed range
+            predict_sents = [[papers[i][index] for index in predict_label if index < len(papers[i])] for i, predict_label in enumerate(pred_ids)]
+
+            bleu_performance = compute_bleu_raw(gold_sents, predict_sents, labels, pred_ids)
+
+            print(sub_topic, performance, bleu_performance)
+            performance_fp.write(f'{sub_topic} {performance} {bleu_performance}\n')
+
+        total_sents = sum(sent_amount)
+        print(f'Total sentences: {total_sents}')
+        performance_fp.write(f'Total sentences: {total_sents}\n')
+        print(f'Total average per paper: {total_sents/len(sent_amount)}')
+        performance_fp.write(f'Total average per paper: {total_sents/len(sent_amount)}\n')
+        print(f'Sentences for each paper: {sent_amount}')
+        performance_fp.write(f'Sentences for each paper: {sent_amount}\n')
+    else:
+        with open(os.path.join(DATAPATH, DATA_TO_TEST[topic]), 'r') as stream:
             raw_labels = stream.readlines()
         labels = [make_tuple(raw_label) for raw_label in raw_labels]
 
-        pred_ids = [sent_ids[topic_id_to_id[topic][i]] for i in range(len(raw_labels))]
+        pred_ids = sent_ids
         performance = calculate_performance(pred_ids, labels)
 
         with open(os.path.join(DATAPATH, TEST_PAPER[topic]), 'r') as stream:
@@ -331,13 +354,15 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], top
         print(topic, performance, bleu_performance)
         performance_fp.write(f'{topic} {performance} {bleu_performance}\n')
 
-    total_sents = sum(sent_amount)
-    print(f'Total sentences: {total_sents}')
-    performance_fp.write(f'Total sentences: {total_sents}\n')
-    print(f'Total average per paper: {total_sents/len(sent_amount)}')
-    performance_fp.write(f'Total average per paper: {total_sents/len(sent_amount)}\n')
-    print(f'Sentences for each paper: {sent_amount}')
-    performance_fp.write(f'Sentences for each paper: {sent_amount}\n')
+        total_sents = sum(sent_amount)
+        print(f'Total sentences: {total_sents}')
+        performance_fp.write(f'Total sentences: {total_sents}\n')
+        print(f'Total average per paper: {total_sents/len(sent_amount)}')
+        performance_fp.write(f'Total average per paper: {total_sents/len(sent_amount)}\n')
+        print(f'Sentences for each paper: {sent_amount}')
+        performance_fp.write(f'Sentences for each paper: {sent_amount}\n')
+
+
 
     performance_fp.close()
 
@@ -345,24 +370,29 @@ def eval_write_output(summaries: List[List[str]], sent_ids: List[List[int]], top
 
 
 def main():
-    # method = 'orig'
-    cluster = os.path.join(DATA_DIR, '*.txt')
-    papers = []
-    scores = []
-    summaries = []
-    sent_amount = []
-    for filename in tqdm(glob.glob(cluster)):
-        result, sentences, num_sentences = eval(method + "('" + filename + "')")
-        summary, score = list(zip(*result))
-        papers.append(sentences)
-        scores.append(score)
-        summaries.append(summary)
-        sent_amount.append(num_sentences)
+    for topic in DATA_TO_TEST.keys():
+        cluster = os.path.join(DATA_DIR, topic, '*.txt')
+        papers = []
+        scores = []
+        summaries = []
+        sent_amount = []
+        for filename in tqdm(glob.glob(cluster)):
+            result, sentences, num_sentences = eval(method + "('" + filename + "')")
+            if result:
+                summary, score = list(zip(*result))
+            else:
+                summary = tuple()
+                score = None
+            papers.append(sentences)
+            scores.append(score)
+            summaries.append(summary)
+            sent_amount.append(num_sentences)
 
-    topic_id_to_id = get_id_match()
-    sent_ids = summaries_to_sent_ids(papers, summaries)
+        # TODO!!!!!!!!!!!!!!!!
+        topic_id_to_id = get_id_match()
+        sent_ids = summaries_to_sent_ids(papers, summaries)
 
-    eval_write_output(summaries, sent_ids, topic_id_to_id, scores, sent_amount)
+        eval_write_output(topic, summaries, sent_ids, topic_id_to_id, scores, sent_amount)
 
 
 if __name__ == '__main__':
